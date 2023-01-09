@@ -4,18 +4,23 @@ import downloadImage from "./assets/download.png";
 import { useComponentVisible } from "./hooks/useClickOutSide";
 import "@microsoft/mgt-components";
 import {
+  Button,
   Switch,
 } from "@fluentui/react-components";
 import { GridLayout } from "./components/layout/grid/GridLayout";
 import TableLayout from "./components/layout/table/TableLayout";
 import { Link } from "@fluentui/react-components";
-
+import {
+  ArrowDownload16Regular,
+} from "@fluentui/react-icons";
+import { downloadFile } from "./utils/SPFileManager";
+import { fileDownloadLink, initItemId } from "./utils/constant";
 const FileLayout = (props) => {
   
   const [searchResults, setSearchResults] = useState([]);
   
   const [breadcrumbs, setBreadcrumbs] = useState([
-    { name: "Home", itemId: "015FCMOUQW6TXD7STWXZEJYSNTOHMKPEW7"},
+    { name: "Home", itemId: initItemId},
   ]);
 
   const [showGridView, setShowGridView] = useState(false);
@@ -24,33 +29,28 @@ const FileLayout = (props) => {
   
   const textareaRef = useRef(null);
   
-  
+  const [openBox, setOpenBox] = useState(-1);
+
   // toggle grid view and table view
   function _onChange(e, checked) {
     setShowGridView(checked?.checked);
   }
-  const [openBox, setOpenBox] = useState(-1);
   const { ref, isComponentVisible, setIsComponentVisible } =
     useComponentVisible(false, [textareaRef]);
 
   const showDownloadLink = (file) => {
-    if (file?.["@microsoft.graph.downloadUrl"]) {
+    if (file?.[fileDownloadLink]) {
       return (
-        <Link
-          href={file["@microsoft.graph.downloadUrl"]}
-          target="_blank"
-          className="file__download"
-        >
-          <img src={downloadImage} alt="download" width={20} />
-          {/* Download<i className="fa fa-download"></i> */}
-        </Link>
+        <Button icon={<ArrowDownload16Regular />} onClick={(e) => downloadFile(file[fileDownloadLink])}>
+          Download
+        </Button>
       );
     }
   };
 
   const openFolder = (file) => {
     if (file?.folder) {
-      console.log("file", file);
+      // console.log("file", file);
     }
   };
 
@@ -75,6 +75,7 @@ const FileLayout = (props) => {
       const response = await fetch(searchUrl, { method: "GET" });
       const result = await response.json();
       props.setLoading(false);
+
       setSearchResults(result.value);
     } catch (error) {
       console.error(error);
@@ -84,9 +85,10 @@ const FileLayout = (props) => {
   const handleItemClick = (file, e) => {
     if (
       e.target.tagName.toLowerCase() === "img" ||
-      e.target.id === "linkSharing"
+      e.target.id === "linkSharing" ||
+      file?.[fileDownloadLink]
     ) {
-      return; // Don't do anything if the clicked element is a textarea
+      return; // Don't do anything if the clicked element is a textarea and if file is a directory
     } else {
       props.setItemId(file.id);
       const newBreadcrumbs = [
@@ -94,10 +96,10 @@ const FileLayout = (props) => {
         { name: file.name, itemId: file.id },
       ];
       setBreadcrumbs(newBreadcrumbs);
+      setSearchQuery('');
       setSearchResults([]); // Clear search results when a file is clicked
     }
   };
-
   return (
     <>
       <Switch label="Grid View or Table View" onChange={_onChange}/>
@@ -128,6 +130,7 @@ const FileLayout = (props) => {
                 const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
                 setBreadcrumbs(newBreadcrumbs);
                 props.setItemId(item.itemId);
+                setSearchQuery('');
                 setSearchResults([]); // Clear search results when a breadcrumb is clicked
               }}
             >
@@ -147,15 +150,16 @@ const FileLayout = (props) => {
           handleLinkShare={handleLinkShare}
           searchResults={searchResults}
           openFolder={openFolder}
-          showDownloadLink={showDownloadLink}
           NextLink={props.NextLink}
-          GetData={props.GetData} 
-          ref={ref} />}      
+          GetData={props.GetData}
+          openBoxRef={ref}
+          textareaRef={textareaRef} />}      
 
       {showGridView && 
       <GridLayout 
         fileData={props.files} 
         loading={props.loading} 
+        GetData={props.GetData}
         handleItemClick={handleItemClick}
         searchResults={searchResults}
         NextLink={props.NextLink}
